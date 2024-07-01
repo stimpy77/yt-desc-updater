@@ -205,7 +205,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Update YouTube video descriptions using AI-generated content.")
     parser.add_argument('--channel_id', default='UCY9XO3gfKgvr94KSSbDu2uA', help="YouTube channel ID")
-    parser.add_argument('--category_id', type=int, default=10, help="YouTube video category ID")
+    parser.add_argument('--category_id', type=int, default=22, help="YouTube video category ID")
     parser.add_argument('--openai_api_key', default=os.getenv("OPENAI_PERSONAL_API_KEY") or os.getenv("OPENAI_API_KEY"), help="OpenAI API key")
     parser.add_argument('--openai_model', default="gpt-4", help="OpenAI model to use")
     parser.add_argument('--max_videos', type=int, default=50, help="Maximum number of videos to process")
