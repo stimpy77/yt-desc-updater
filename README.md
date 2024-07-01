@@ -15,7 +15,7 @@ This Python script automates the process of updating YouTube video descriptions 
 ## Prerequisites
 
 - Python 3.6 or higher
-- Google Cloud project with YouTube Data API enabled
+- Google Cloud project with YouTube Data API v3 enabled
 - OAuth 2.0 Client ID (downloaded as `client_secret.json`)
 - OpenAI API key
 - Required Python packages (see Installation section)
@@ -54,7 +54,7 @@ python ytdesc.py --channel_id YOUR_CHANNEL_ID
 ### Command-line Arguments
 
 - `--channel_id`: YouTube channel ID (required)
-- `--category_id`: YouTube video category ID (default: 22)
+- `--category_id`: YouTube video category ID (default: 22 - People & Blogs)
 - `--openai_api_key`: OpenAI API key (can be set via environment variable)
 - `--openai_model`: OpenAI model to use (default: "gpt-4")
 - `--max_videos`: Maximum number of videos to process (default: 50)
@@ -86,6 +86,20 @@ python ytdesc.py --channel_id YOUR_CHANNEL_ID --openai_model "gpt-3.5-turbo" --m
 
 The script uses OAuth 2.0 for authentication with the YouTube Data API. On first run, it will open a browser window asking you to log in to your Google account and grant the necessary permissions. After authentication, a `token.pickle` file will be created to store the access token for future runs.
 
+## Environment Variables
+
+The script can use the following environment variables:
+
+- `OPENAI_API_KEY`: Your OpenAI API key
+- `YOUTUBE_API_KEY`: Your YouTube Data API key (as a fallback if OAuth fails)
+
+You can set these variables in your shell:
+
+```
+export OPENAI_API_KEY="your_openai_api_key"
+export YOUTUBE_API_KEY="your_youtube_api_key"
+```
+
 ## Notes
 
 - The script will skip videos that already have descriptions unless the `--force_update` flag is used.
@@ -97,12 +111,13 @@ The script uses OAuth 2.0 for authentication with the YouTube Data API. On first
 
 - If you encounter authentication issues, delete the `token.pickle` file and run the script again to re-authenticate.
 - For any HTTP errors, check your internet connection and the validity of your OAuth 2.0 credentials.
+- If you receive a 403 Forbidden error, ensure that the authenticated Google account has owner or manager rights for the YouTube channel you're trying to update.
 - If transcript fetching fails, it may be due to unavailable transcripts for specific videos. The script will continue without transcripts in such cases.
 
 ## Contributing
 
-Contributions, issues, and feature requests are welcome. Feel free to check [issues page](link_to_your_issues_page) if you want to contribute.
+Contributions, issues, and feature requests are welcome. Feel free to check [issues page](https://github.com/stimpy77/yt-desc-updater/issues) if you want to contribute.
 
 ## License
 
-[Specify your license here, e.g., MIT, GPL, etc.]
+whatever
