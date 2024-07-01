@@ -14,7 +14,11 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
+SCOPES = [
+    'https://www.googleapis.com/auth/youtube.force-ssl',
+    'https://www.googleapis.com/auth/youtubepartner',
+    'https://www.googleapis.com/auth/youtube'
+]
 
 # Try to import youtube_transcript_api
 try:
@@ -26,24 +30,23 @@ except ImportError:
 
 def get_authenticated_service():
     creds = None
-    # The file token.pickle stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first time.
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'client_secret.json', SCOPES)
+            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save the credentials for the next run
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
-
-    return build('youtube', 'v3', credentials=creds)
+    
+    try:
+        return build('youtube', 'v3', credentials=creds)
+    except HttpError as e:
+        logger.error(f"An error occurred while building the YouTube service: {e}")
+        return None
 
 def get_channel_info(youtube, channel_id):
     logger.info(f"Fetching channel info for channel ID: {channel_id}")
@@ -116,19 +119,35 @@ def generate_ai_description(openai_api_key, transcript, title, channel_descripti
 
 def update_video_description(youtube, video_id, new_description, category_id):
     logger.info(f"Updating description for video ID: {video_id}")
-    request = youtube.videos().update(
-        part="snippet",
-        body={
-            "id": video_id,
-            "snippet": {
-                "categoryId": category_id,
-                "description": new_description
+    try:
+        video_response = youtube.videos().list(
+            part='snippet',
+            id=video_id
+        ).execute()
+
+        if not video_response['items']:
+            logger.error(f"Video not found: {video_id}")
+            return None
+
+        snippet = video_response['items'][0]['snippet']
+        snippet['description'] = new_description
+        snippet['categoryId'] = category_id
+
+        request = youtube.videos().update(
+            part="snippet",
+            body={
+                "id": video_id,
+                "snippet": snippet
             }
-        }
-    )
-    response = request.execute()
-    logger.info(f"Description updated successfully for video ID: {video_id}")
-    return response
+        )
+        response = request.execute()
+        logger.info(f"Description updated successfully for video ID: {video_id}")
+        return response
+    except HttpError as e:
+        logger.error(f"An error occurred while updating the video description: {e}")
+        if e.resp.status == 403:
+            logger.error("This could be due to insufficient permissions. Please ensure you're using an account with appropriate access to this channel.")
+        return None
 
 def pause_execution(args):
     if args.pause:
@@ -152,6 +171,9 @@ def main(args):
 
     try:
         youtube = get_authenticated_service()
+        if not youtube:
+            logger.error("Failed to authenticate with YouTube. Please check your credentials and try again.")
+            return
         channel_description = get_channel_info(youtube, args.channel_id)
 
         # Parse upsell links if provided
@@ -197,6 +219,8 @@ def main(args):
 
     except HttpError as e:
         logger.error(f"An HTTP error occurred: {e}")
+        if e.resp.status == 403:
+            logger.error("This could be due to insufficient permissions. Please ensure you're using an account with appropriate access to this channel.")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
 
@@ -204,7 +228,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Update YouTube video descriptions using AI-generated content.")
-    parser.add_argument('--channel_id', default='UCY9XO3gfKgvr94KSSbDu2uA', help="YouTube channel ID")
+    parser.add_argument('--channel_id', default='', help="YouTube channel ID")
     parser.add_argument('--category_id', type=int, default=22, help="YouTube video category ID")
     parser.add_argument('--openai_api_key', default=os.getenv("OPENAI_PERSONAL_API_KEY") or os.getenv("OPENAI_API_KEY"), help="OpenAI API key")
     parser.add_argument('--openai_model', default="gpt-4", help="OpenAI model to use")
