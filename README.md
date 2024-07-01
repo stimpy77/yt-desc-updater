@@ -32,8 +32,8 @@ pip install google-api-python-client openai youtube_transcript_api
 3. Set up your API keys as environment variables (recommended) or prepare them for command-line input:
 
 ```
-export YOUTUBE_DATA_PERSONAL_API_KEY="your_youtube_api_key"
-export OPENAI_PERSONAL_API_KEY="your_openai_api_key"
+export YOUTUBE_API_KEY="your_youtube_api_key"
+export OPENAI_API_KEY="your_openai_api_key"
 ```
 
 ## Usage
