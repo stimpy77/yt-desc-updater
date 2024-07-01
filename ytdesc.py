@@ -14,11 +14,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = [
-    'https://www.googleapis.com/auth/youtube.force-ssl',
-    'https://www.googleapis.com/auth/youtubepartner',
-    'https://www.googleapis.com/auth/youtube'
-]
+SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
 
 # Try to import youtube_transcript_api
 try:
@@ -42,11 +38,7 @@ def get_authenticated_service():
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
     
-    try:
-        return build('youtube', 'v3', credentials=creds)
-    except HttpError as e:
-        logger.error(f"An error occurred while building the YouTube service: {e}")
-        return None
+    return build('youtube', 'v3', credentials=creds)
 
 def get_channel_info(youtube, channel_id):
     logger.info(f"Fetching channel info for channel ID: {channel_id}")
@@ -120,6 +112,7 @@ def generate_ai_description(openai_api_key, transcript, title, channel_descripti
 def update_video_description(youtube, video_id, new_description, category_id):
     logger.info(f"Updating description for video ID: {video_id}")
     try:
+        # First, get the existing video details
         video_response = youtube.videos().list(
             part='snippet',
             id=video_id
@@ -129,10 +122,14 @@ def update_video_description(youtube, video_id, new_description, category_id):
             logger.error(f"Video not found: {video_id}")
             return None
 
+        # Get the existing snippet
         snippet = video_response['items'][0]['snippet']
-        snippet['description'] = new_description
-        snippet['categoryId'] = category_id
 
+        # Update only the description and category
+        snippet['description'] = new_description
+        snippet['categoryId'] = str(category_id)  # Ensure category_id is a string
+
+        # Update the video with the new snippet
         request = youtube.videos().update(
             part="snippet",
             body={
@@ -144,7 +141,8 @@ def update_video_description(youtube, video_id, new_description, category_id):
         logger.info(f"Description updated successfully for video ID: {video_id}")
         return response
     except HttpError as e:
-        logger.error(f"An error occurred while updating the video description: {e}")
+        logger.error(f"An HTTP error occurred: {e}")
+        logger.error(f"Response content: {e.content}")
         if e.resp.status == 403:
             logger.error("This could be due to insufficient permissions. Please ensure you're using an account with appropriate access to this channel.")
         return None
@@ -171,9 +169,6 @@ def main(args):
 
     try:
         youtube = get_authenticated_service()
-        if not youtube:
-            logger.error("Failed to authenticate with YouTube. Please check your credentials and try again.")
-            return
         channel_description = get_channel_info(youtube, args.channel_id)
 
         # Parse upsell links if provided
@@ -219,6 +214,7 @@ def main(args):
 
     except HttpError as e:
         logger.error(f"An HTTP error occurred: {e}")
+        logger.error(f"Response content: {e.content}")
         if e.resp.status == 403:
             logger.error("This could be due to insufficient permissions. Please ensure you're using an account with appropriate access to this channel.")
     except Exception as e:
@@ -228,8 +224,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Update YouTube video descriptions using AI-generated content.")
-    parser.add_argument('--channel_id', default='', help="YouTube channel ID")
-    parser.add_argument('--category_id', type=int, default=22, help="YouTube video category ID")
+    parser.add_argument('--channel_id', default='UCY9XO3gfKgvr94KSSbDu2uA', help="YouTube channel ID")
+    parser.add_argument('--category_id', type=int, default=10, help="YouTube video category ID")
     parser.add_argument('--openai_api_key', default=os.getenv("OPENAI_PERSONAL_API_KEY") or os.getenv("OPENAI_API_KEY"), help="OpenAI API key")
     parser.add_argument('--openai_model', default="gpt-4", help="OpenAI model to use")
     parser.add_argument('--max_videos', type=int, default=50, help="Maximum number of videos to process")
@@ -239,4 +235,3 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     main(args)
-
