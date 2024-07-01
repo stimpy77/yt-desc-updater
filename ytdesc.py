@@ -1,7 +1,10 @@
 import os
+import pickle
 import argparse
 import json
 import logging
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from openai import OpenAI
@@ -9,6 +12,9 @@ from openai import OpenAI
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# If modifying these scopes, delete the file token.pickle.
+SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
 
 # Try to import youtube_transcript_api
 try:
@@ -18,9 +24,26 @@ except ImportError:
     logger.warning("youtube_transcript_api is not installed. Transcript fetching will be disabled.")
     TRANSCRIPT_API_AVAILABLE = False
 
-def get_youtube_service(api_key):
-    logger.info("Initializing YouTube service with API key")
-    return build('youtube', 'v3', developerKey=api_key, static_discovery=False)
+def get_authenticated_service():
+    creds = None
+    # The file token.pickle stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first time.
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'client_secret.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    return build('youtube', 'v3', credentials=creds)
 
 def get_channel_info(youtube, channel_id):
     logger.info(f"Fetching channel info for channel ID: {channel_id}")
@@ -123,23 +146,12 @@ def pause_execution(args):
     return True
 
 def main(args):
-    if not args.youtube_api_key:
-        logger.error("YouTube API key is missing. Please provide it using the --youtube_api_key argument or set the YOUTUBE_API_KEY environment variable.")
-        return
-
     if not args.openai_api_key:
         logger.error("OpenAI API key is missing. Please provide it using the --openai_api_key argument or set the OPENAI_API_KEY environment variable.")
         return
 
-    if not TRANSCRIPT_API_AVAILABLE:
-        logger.warning("youtube_transcript_api is not installed. The script will run without fetching transcripts.")
-        user_input = input("Do you want to continue without transcript fetching? (y/n): ").strip().lower()
-        if user_input != 'y':
-            logger.info("Script execution cancelled by user.")
-            return
-
     try:
-        youtube = get_youtube_service(args.youtube_api_key)
+        youtube = get_authenticated_service()
         channel_description = get_channel_info(youtube, args.channel_id)
 
         # Parse upsell links if provided
@@ -192,9 +204,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Update YouTube video descriptions using AI-generated content.")
-    parser.add_argument('--channel_id', default='', help="YouTube channel ID")
-    parser.add_argument('--category_id', type=int, default=22, help="YouTube video category ID") # 10=music, 22=People&Blogs
-    parser.add_argument('--youtube_api_key', default=os.getenv("YOUTUBE_DATA_PERSONAL_API_KEY") or os.getenv("YOUTUBE_API_KEY"), help="YouTube API key")
+    parser.add_argument('--channel_id', default='UCY9XO3gfKgvr94KSSbDu2uA', help="YouTube channel ID")
+    parser.add_argument('--category_id', type=int, default=10, help="YouTube video category ID")
     parser.add_argument('--openai_api_key', default=os.getenv("OPENAI_PERSONAL_API_KEY") or os.getenv("OPENAI_API_KEY"), help="OpenAI API key")
     parser.add_argument('--openai_model', default="gpt-4", help="OpenAI model to use")
     parser.add_argument('--max_videos', type=int, default=50, help="Maximum number of videos to process")
