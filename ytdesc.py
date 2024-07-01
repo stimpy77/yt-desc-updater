@@ -141,10 +141,14 @@ def update_video_description(youtube, video_id, new_description, category_id):
         logger.info(f"Description updated successfully for video ID: {video_id}")
         return response
     except HttpError as e:
+        error_content = json.loads(e.content.decode('utf-8'))
         logger.error(f"An HTTP error occurred: {e}")
-        logger.error(f"Response content: {e.content}")
+        logger.error(f"Error details: {error_content}")
         if e.resp.status == 403:
             logger.error("This could be due to insufficient permissions. Please ensure you're using an account with appropriate access to this channel.")
+        return None
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {str(e)}")
         return None
 
 def pause_execution(args):
@@ -213,12 +217,13 @@ def main(args):
                 break
 
     except HttpError as e:
+        error_content = json.loads(e.content.decode('utf-8'))
         logger.error(f"An HTTP error occurred: {e}")
-        logger.error(f"Response content: {e.content}")
+        logger.error(f"Error details: {error_content}")
         if e.resp.status == 403:
             logger.error("This could be due to insufficient permissions. Please ensure you're using an account with appropriate access to this channel.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
+        logger.error(f"An unexpected error occurred: {str(e)}")
 
     logger.info("Script execution completed")
 
@@ -235,3 +240,4 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     main(args)
+
